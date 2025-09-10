@@ -1,0 +1,96 @@
+import { create } from 'zustand';
+import sampleData from '../api/sample-response.json';
+import type { 
+  Borrower, 
+  Pipeline, 
+  Store,
+  BrokerInfo,
+  ActionResponse 
+} from './store/types';
+
+// Helper to find endpoint data from sample responses
+const findEndpoint = (name: string) => sampleData.endpoints.find(e => e.name === name)
+
+// Helper to convert raw data to Borrower type
+const toBorrower = (b: any): Borrower => ({
+  id: b.id,
+  name: b.name,
+  loan_type: b.loan_type,
+  amount: b.amount,
+  status: b.status,
+  email: b.email || '',
+  phone: b.phone,
+  loan_amount: b.loan_amount,
+  employment: b.employment,
+  existing_loan: b.existing_loan,
+  credit_score: b.credit_score,
+  source_of_funds: b.source_of_funds,
+  risk_signal: b.risk_signal,
+  ai_flags: b.ai_flags
+});
+
+// Get endpoint data
+const pipelineData = findEndpoint('Get Borrower Pipeline')?.response;
+const borrowerDetail = findEndpoint('Get Borrower Detail')?.response;
+const brokerData = findEndpoint('Get Broker Info')?.response as BrokerInfo;
+const workflowData = findEndpoint('Get Onboarding Workflow')?.response;
+
+// Initialize store with initial data
+// Create store instance
+export const useStore = create<Store>((set, get) => ({
+  active: borrowerDetail ? toBorrower(borrowerDetail) : null,
+  setActive: (borrower) => set({ active: borrower }),
+
+  pipeline: {
+    all: [
+      ...(pipelineData?.new || []).map(toBorrower),
+      ...(pipelineData?.in_review || []).map(toBorrower),
+      ...(pipelineData?.approved || []).map(toBorrower)
+    ],
+    new: (pipelineData?.new || []).map(toBorrower),
+    inProgress: (pipelineData?.in_review || []).map(toBorrower),
+    approved: (pipelineData?.approved || []).map(toBorrower)
+  },
+
+  broker: brokerData,
+  workflow: workflowData?.steps || [],
+
+  // Action handlers
+  requestDocuments: () => {
+    const response = findEndpoint('Request Documents')?.response as ActionResponse;
+    if (response?.success) {
+      get().showToast(response.message, 'success');
+    }
+  },
+
+  sendToValuer: () => {
+    const response = findEndpoint('Send to Valuer')?.response as ActionResponse;
+    if (response?.success) {
+      get().showToast(response.message, 'success');
+    }
+  },
+
+  approveLoan: () => {
+    const response = findEndpoint('Approve Loan')?.response as ActionResponse;
+    if (response?.success) {
+      get().showToast(response.message, 'success');
+    }
+  },
+
+  escalateToCommittee: () => {
+    const response = findEndpoint('Escalate to Credit Committee')?.response as ActionResponse;
+    if (response?.success) {
+      get().showToast(response.message, 'success');
+    }
+  },
+
+  showToast: (message: string, type: 'success' | 'error') => {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg ${
+      type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+    }`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+}));
